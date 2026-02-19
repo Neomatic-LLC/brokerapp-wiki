@@ -19,9 +19,15 @@
 
 ## 3. Установка виджета
 
-Вам будет предоставлена ссылка, которую надо будет указать следующим образом:
+Вам будет предоставлена ссылка, которую надо будет прописать следующим образом:
 
-`<script src="https://brokerapp.ru/widget/widget-{unique-id}.js)"> </script>`,
+```html
+
+<script src="https://brokerapp.ru/widget/widget-{unique-id}.js"></script>
+
+
+```
+
 
 где `https://brokerapp.ru/widget/widget-{unique-id}.js` - полученная Вами ссылка на js - файл.
 
