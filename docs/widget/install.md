@@ -19,9 +19,11 @@
 
 ## 3. Установка виджета
 
-Вам будет предоставлен HTML-код, аналогичный примеру ниже:
-<!-- Подключение скрипта виджета -->
-<script src="https://brokerapp.ru/widget/widget-{unique-id}.js)"> </script>
+Вам будет предоставлена ссылка, которую надо будет указать следующим образом:
+
+`<script src="https://brokerapp.ru/widget/widget-{unique-id}.js)"> </script>`,
+
+где `https://brokerapp.ru/widget/widget-{unique-id}.js` - полученная Вами ссылка на js - файл.
 
 Всё, что нужно — скопировать этот код и вставить его на свой сайт.
 
