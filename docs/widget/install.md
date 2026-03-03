@@ -37,7 +37,7 @@
 
 ```html
 
-<script data-osago-theme="redwhite" 
+<script data-osago-theme="alfastrah" 
 src="https://brokerapp.ru/widget/widget-{unique-id}.js"></script>
 
 ```
