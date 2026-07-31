@@ -1,4 +1,4 @@
-name: Update osago-widget.js
+name: Update osago-widget.js (prod)
 
 # Ручной запуск через Actions -> Update osago-widget.js -> Run workflow
 on:
