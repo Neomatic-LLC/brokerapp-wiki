@@ -1,0 +1,96 @@
+name: Update osago-widget.js
+
+# Ручной запуск через Actions -> Update osago-widget.js -> Run workflow
+on:
+  workflow_dispatch:
+    inputs:
+      jsdelivr_ref:
+        description: 'Ветка/тег для purge в jsDelivr (используется в URL cdn.jsdelivr.net/gh/Neomatic-LLC/brokerapp-wiki@<ref>/...). По умолчанию main.'
+        required: false
+        default: 'main'
+
+jobs:
+  update-widget:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download and rename widget file
+        run: |
+          # --insecure нужен т.к. на test4.teamsite.ru, возможно, самоподписанный сертификат
+          # --fail — падать при HTTP-ошибке (например, 404), а не сохранять страницу ошибки
+          curl --insecure --fail -o osago-widget.js https://test4.teamsite.ru/osago/osago-widget-prod.js
+          # Проверяем, что файл не пустой и это действительно JS
+          test -s osago-widget.js && echo "Downloaded: $(wc -c < osago-widget.js) bytes"
+
+      - name: Copy to target folders
+        run: |
+          mkdir -p docs/widget/osago widget/osago
+          cp osago-widget.js docs/widget/osago/osago-widget.js
+          cp osago-widget.js widget/osago/osago-widget.js
+
+      - name: Commit and push
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/widget/osago/osago-widget.js widget/osago/osago-widget.js
+          if git diff --cached --quiet; then
+            echo "No changes — file is already up to date"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Update osago-widget.js from test4.teamsite.ru"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Эквивалент кнопки "Purge now" на https://www.jsdelivr.com/tools/purge
+      # — форма на этой странице шлёт POST на https://purge.jsdelivr.net/ с телом {"path":[...]}
+      - name: Purge jsDelivr cache
+        if: ${{ steps.commit.outputs.changed == 'true' }}
+        run: |
+          REF="${{ github.event.inputs.jsdelivr_ref }}"
+          PATH_TO_PURGE="/gh/Neomatic-LLC/brokerapp-wiki@${REF}/widget/osago/osago-widget.js"
+          echo "Purging: https://cdn.jsdelivr.net${PATH_TO_PURGE}"
+          curl --fail -sS -X POST https://purge.jsdelivr.net/ \
+            -H "Content-Type: application/json" \
+            -d "{\"path\":[\"${PATH_TO_PURGE}\"]}"
+
+      # Проверка, что CDN отдаёт свежий файл: сравниваем SHA-256
+      # файла с jsDelivr и с raw.githubusercontent (минуя CDN)
+      - name: Verify jsDelivr serves fresh file
+        if: ${{ steps.commit.outputs.changed == 'true' }}
+        run: |
+          REF="${{ github.event.inputs.jsdelivr_ref }}"
+          CDN_URL="https://cdn.jsdelivr.net/gh/Neomatic-LLC/brokerapp-wiki@${REF}/widget/osago/osago-widget.js"
+          GH_URL="https://raw.githubusercontent.com/Neomatic-LLC/brokerapp-wiki/${REF}/widget/osago/osago-widget.js"
+
+          curl --fail -sS -o /tmp/from-github.js "$GH_URL"
+          GH_HASH=$(sha256sum /tmp/from-github.js | awk '{print $1}')
+          echo "GitHub hash:   $GH_HASH"
+
+          # jsDelivr может пересобирать кэш несколько секунд после purge — пробуем до 10 раз
+          OK=0
+          for i in $(seq 1 10); do
+            if ! curl --fail -sS -o /tmp/from-jsdelivr.js "$CDN_URL"; then
+              echo "attempt $i: download failed, retrying..."
+              sleep 10
+              continue
+            fi
+            CDN_HASH=$(sha256sum /tmp/from-jsdelivr.js | awk '{print $1}')
+            echo "attempt $i — jsDelivr hash: $CDN_HASH"
+            if [ "$CDN_HASH" = "$GH_HASH" ]; then
+              OK=1
+              break
+            fi
+            sleep 10
+          done
+
+          if [ "$OK" != "1" ]; then
+            echo "::error::jsDelivr still serves outdated content after 10 attempts"
+            exit 1
+          fi
+          echo "OK — jsDelivr and GitHub hashes match"
